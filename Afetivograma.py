@@ -260,25 +260,58 @@ if not df_historico.empty:
     df_historico = df_historico.dropna(subset=['DataHora_Real']).sort_values(by='DataHora_Real').reset_index(drop=True)
     df_historico['Sono_Vis'] = df_historico['Sono'].apply(lambda x: f"{int(x)}h{int((x % 1) * 60):02d}m".replace("h00m", "h") if pd.notnull(x) and x != "" else "")
 
-    col_filtro, _ = st.columns([4, 8])
-    with col_filtro:
+    col_f1, col_f2 = st.columns([5, 4])
+    with col_f1:
         filtro_tempo = st.radio("Período de Visualização:", ["Semanal (Dom-Sáb)", "Quinzenal", "Mensal", "Todos"], index=3, horizontal=True)
 
     df_plot = df_historico.copy()
-    if not df_plot.empty:
-        data_maxima = df_plot['DataHora_Real'].max()
 
+    if not df_plot.empty:
         if filtro_tempo == "Semanal (Dom-Sáb)":
-            dias_desde_domingo = (data_maxima.weekday() + 1) % 7
-            inicio_semana = (data_maxima - timedelta(days=dias_desde_domingo)).replace(hour=0, minute=0, second=0)
-            fim_semana = inicio_semana + timedelta(days=6, hours=23, minutes=59)
-            df_plot = df_plot[(df_plot['DataHora_Real'] >= inicio_semana) & (df_plot['DataHora_Real'] <= fim_semana)]
+            df_plot['Semana_Inicio'] = df_plot['DataHora_Real'].apply(lambda d: (d - timedelta(days=(d.weekday() + 1) % 7)).replace(hour=0, minute=0, second=0))
+            semanas_unicas = sorted(df_plot['Semana_Inicio'].unique(), reverse=True)
+            
+            opcoes_semana = {}
+            for sem in semanas_unicas:
+                fim_sem = sem + timedelta(days=6, hours=23, minutes=59)
+                lbl = f"Semana: {sem.strftime('%d/%m/%Y')} a {fim_sem.strftime('%d/%m/%Y')}"
+                opcoes_semana[lbl] = sem
+
+            with col_f2:
+                sel_sem = st.selectbox("Selecione a Semana:", options=list(opcoes_semana.keys()))
+            
+            sem_ini = opcoes_semana[sel_sem]
+            sem_fim = sem_ini + timedelta(days=6, hours=23, minutes=59)
+            df_plot = df_plot[(df_plot['DataHora_Real'] >= sem_ini) & (df_plot['DataHora_Real'] <= sem_fim)]
+
         elif filtro_tempo == "Quinzenal":
-            inicio_quinzena = data_maxima - timedelta(days=15)
-            df_plot = df_plot[df_plot['DataHora_Real'] >= inicio_quinzena]
+            def get_quinzena_tuple(d):
+                q = 1 if d.day <= 15 else 2
+                return (d.year, d.month, q, f"{q}ª Quinzena de {d.strftime('%m/%Y')}")
+
+            q_raw = df_plot['DataHora_Real'].apply(get_quinzena_tuple).unique()
+            q_sorted = sorted(q_raw, key=lambda x: (x[0], x[1], x[2]), reverse=True)
+            opcoes_quinzena = {x[3]: (x[0], x[1], x[2]) for x in q_sorted}
+
+            with col_f2:
+                sel_q = st.selectbox("Selecione a Quinzena:", options=list(opcoes_quinzena.keys()))
+
+            ano, mes, q_num = opcoes_quinzena[sel_q]
+            if q_num == 1:
+                df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes) & (df_plot['DataHora_Real'].dt.day <= 15)]
+            else:
+                df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes) & (df_plot['DataHora_Real'].dt.day > 15)]
+
         elif filtro_tempo == "Mensal":
-            inicio_mes = data_maxima.replace(day=1, hour=0, minute=0, second=0)
-            df_plot = df_plot[df_plot['DataHora_Real'] >= inicio_mes]
+            m_raw = df_plot['DataHora_Real'].apply(lambda d: (d.year, d.month, d.strftime('%m/%Y'))).unique()
+            m_sorted = sorted(m_raw, key=lambda x: (x[0], x[1]), reverse=True)
+            opcoes_mes = {x[2]: (x[0], x[1]) for x in m_sorted}
+
+            with col_f2:
+                sel_m = st.selectbox("Selecione o Mês:", options=list(opcoes_mes.keys()))
+
+            ano, mes = opcoes_mes[sel_m]
+            df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes)]
 
     fig = go.Figure()
 
@@ -316,8 +349,8 @@ if not df_historico.empty:
     fig.update_xaxes(
         showgrid=False,
         tickmode='array',
-        tickvals=df_plot['DataHora_Real'],
-        ticktext=df_plot['DataHora_Real'].dt.strftime("%d/%m\n%H:%M")
+        tickvals=df_plot['DataHora_Real'] if not df_plot.empty else [],
+        ticktext=df_plot['DataHora_Real'].dt.strftime("%d/%m\n%H:%M") if not df_plot.empty else []
     )
     
     fig.update_yaxes(
