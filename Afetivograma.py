@@ -1,3 +1,4 @@
+# afetivograma_v.1.2
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -112,7 +113,7 @@ if 'in_id_sel' not in st.session_state:
 if 'in_data' not in st.session_state:
     st.session_state['in_data'] = get_today_br()
 if 'in_hora' not in st.session_state:
-    st.session_state['in_hora'] = get_now_br().strftime("%H:%M")
+    st.session_state['in_hora'] = "21:30"
 if 'in_humor' not in st.session_state:
     st.session_state['in_humor'] = 0
 if 'in_ans' not in st.session_state:
@@ -145,7 +146,7 @@ def carregar_registro_callback():
                 st.session_state['in_data'] = datetime.strptime(str(reg['Data_Str']), "%d/%m/%Y").date()
             except:
                 st.session_state['in_data'] = get_today_br()
-            st.session_state['in_hora'] = str(reg['Horario_Str']) if str(reg['Horario_Str']) in horarios_opcoes else get_now_br().strftime("%H:%M")
+            st.session_state['in_hora'] = str(reg['Horario_Str']) if str(reg['Horario_Str']) in horarios_opcoes else "21:30"
             st.session_state['in_humor'] = int(reg['Humor_Val']) if reg['Humor_Val'] != "" else 0
             st.session_state['in_ans'] = int(reg['Ansiedade_Val']) if reg['Ansiedade_Val'] != "" else 0
             st.session_state['in_irr'] = int(reg['Irritabilidade_Val']) if reg['Irritabilidade_Val'] != "" else 0
@@ -158,7 +159,7 @@ def carregar_registro_callback():
             st.session_state['in_not'] = str(reg['Notas'])
     else:
         st.session_state['in_data'] = get_today_br()
-        st.session_state['in_hora'] = get_now_br().strftime("%H:%M")
+        st.session_state['in_hora'] = "21:30"
         st.session_state['in_humor'] = 0
         st.session_state['in_ans'] = 0
         st.session_state['in_irr'] = 0
@@ -312,94 +313,4 @@ if not df_historico.empty:
                 df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes) & (df_plot['DataHora_Real'].dt.day > 15)]
 
         elif filtro_tempo == "Mensal":
-            m_raw = df_plot['DataHora_Real'].apply(lambda d: (d.year, d.month, d.strftime('%m/%Y'))).unique()
-            m_sorted = sorted(m_raw, key=lambda x: (x[0], x[1]), reverse=True)
-            opcoes_mes = {x[2]: (x[0], x[1]) for x in m_sorted}
-
-            with col_f2:
-                sel_m = st.selectbox("Selecione o Mês:", options=list(opcoes_mes.keys()))
-
-            ano, mes = opcoes_mes[sel_m]
-            df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes)]
-
-    # --- FUNÇÃO GERADORA DE FIGURA PLOTLY (TELAS ESCURAS / IMPRESSÃO CLARA) ---
-    def criar_figura(modo_impressao=False):
-        fig = go.Figure()
-        
-        bg_color = '#FFFFFF' if modo_impressao else '#111111'
-        font_color = '#000000' if modo_impressao else 'white'
-        grid_color = '#DDDDDD' if modo_impressao else '#222222'
-        vline_color = '#CCCCCC' if modo_impressao else '#555555'
-
-        # Cores ajustadas para alto contraste no fundo branco de impressão
-        c_sociedade = '#008B8B' if modo_impressao else '#00FFFF' # Ciano escuro legível em fundo branco
-        c_estrelas = '#333333' if modo_impressao else 'white'     # Estrela escura para fundo branco
-
-        if not df_plot.empty:
-            for dt_reg in df_plot['DataHora_Real']:
-                fig.add_vline(x=dt_reg, line_width=1, line_dash="dot", line_color=vline_color)
-
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=df_plot['Humor_Val'], name="Humor", customdata=df_plot['Humor_Desc'], mode='lines+markers', line_shape='spline', line=dict(color="#3498DB", width=3), marker=dict(size=9), hovertemplate="<b>Humor:</b> %{customdata}<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=df_plot['Ansiedade_Val'], name="Ansiedade", customdata=df_plot['Ansiedade_Desc'], mode='lines+markers', line_shape='spline', line=dict(color="#E67E22", width=2), hovertemplate="<b>Ansiedade:</b> %{customdata}<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=df_plot['Irritabilidade_Val'], name="Irritabilidade", customdata=df_plot['Irritabilidade_Desc'], mode='lines+markers', line_shape='spline', line=dict(color="#FF1493", width=2), hovertemplate="<b>Irritabilidade:</b> %{customdata}<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=df_plot['Social_Val'], name="Sociedade", customdata=df_plot['Social_Desc'], mode='lines+markers', line_shape='spline', line=dict(color=c_sociedade, width=2), hovertemplate="<b>Sociedade:</b> %{customdata}<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=df_plot['Esquizofrenia_Val'], name="Delírios", customdata=df_plot['Esquizofrenia_Clinico'], mode='lines+markers', line_shape='spline', line=dict(color="#9B59B6", width=2), hovertemplate="<b>Delírios/Psicose:</b> %{customdata}<extra></extra>"))
-
-            fig.add_trace(go.Scatter(x=df_plot['DataHora_Real'], y=[-3.6] * len(df_plot), name="Sono", text=df_plot['Sono_Vis'], mode='text', textposition='top center', textfont=dict(color="#27AE60" if modo_impressao else "#2ECC71", size=11, weight="bold" if modo_impressao else "normal"), hovertemplate="<b>Horas de Sono:</b> %{text}<extra></extra>"))
-
-            df_sexo = df_plot[df_plot['Sexo_Val'] == 1]
-            if not df_sexo.empty:
-                fig.add_trace(go.Scatter(x=df_sexo['DataHora_Real'], y=[-4.2] * len(df_sexo), name="Sexo", mode='markers', marker=dict(symbol='square', color='#D4AC0D' if modo_impressao else '#F1C40F', size=9), hovertemplate="<b>Atividade Sexual:</b> Sim<extra></extra>"))
-
-            df_dor = df_plot[df_plot['Condicao_Fisica'].astype(str) != ""]
-            if not df_dor.empty:
-                fig.add_trace(go.Scatter(x=df_dor['DataHora_Real'], y=[-4.8] * len(df_dor), name="Dor / Físico", customdata=df_dor['Condicao_Fisica'], mode='markers', marker=dict(symbol='square', color='#E74C3C', size=9), hovertemplate="<b>Condição Física:</b> %{customdata}<extra></extra>"))
-
-            df_notas = df_plot[(df_plot['Notas'].astype(str) != "") | (df_plot['Gatilhos'].astype(str) != "")].copy()
-            if not df_notas.empty:
-                df_notas['Hover_Notas'] = "Anotação: " + df_notas['Notas'].astype(str) + "<br>Gatilhos: " + df_notas['Gatilhos'].astype(str)
-                fig.add_trace(go.Scatter(x=df_notas['DataHora_Real'], y=[-5.4] * len(df_notas), name="Anotações / Gatilhos", customdata=df_notas['Hover_Notas'], mode='markers', marker=dict(symbol='star', color=c_estrelas, size=11, line=dict(width=1, color='black' if modo_impressao else 'none')), hovertemplate="<b>%{customdata}</b><extra></extra>"))
-
-        fig.update_layout(
-            plot_bgcolor=bg_color, paper_bgcolor=bg_color, font=dict(color=font_color),
-            hovermode="x unified", legend=dict(orientation="h", y=-0.22, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        
-        fig.update_xaxes(
-            showgrid=False,
-            tickmode='array',
-            tickvals=df_plot['DataHora_Real'] if not df_plot.empty else [],
-            ticktext=df_plot['DataHora_Real'].dt.strftime("%d/%m\n%H:%M") if not df_plot.empty else []
-        )
-        
-        fig.update_yaxes(
-            title_text="Evolução",
-            range=[-6.0, 3.8],
-            tickvals=[-3, -2, -1, 0, 1, 2, 3],
-            showgrid=True,
-            gridcolor=grid_color,
-            gridwidth=1
-        )
-        return fig
-
-    # Renderiza gráfico normal na tela do Streamlit
-    fig_tela = criar_figura(modo_impressao=False)
-    st.plotly_chart(fig_tela, width='stretch')
-
-    # Botões de Download
-    col_dl1, col_dl2, col_dl3 = st.columns([2, 5, 5])
-    with col_dl1:
-        output_xlsx = BytesIO()
-        df_historico.drop(columns=['DataHora_Real', 'Sono_Vis'], errors='ignore').to_excel(output_xlsx, index=False, engine='openpyxl')
-        st.download_button("📥 Baixar Tabela (.xlsx)", data=output_xlsx.getvalue(), file_name="afetivograma_dados.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    with col_dl2:
-        html_grafico = fig_tela.to_html(full_html=True, include_plotlyjs='cdn')
-        st.download_button("📉 Baixar Gráfico (.html)", data=html_grafico, file_name="afetivograma_grafico.html", mime="text/html")
-    with col_dl3:
-        fig_impressao = criar_figura(modo_impressao=True)
-        html_impressao = fig_impressao.to_html(full_html=True, include_plotlyjs='cdn')
-        st.download_button("🖨️ Baixar Gráfico para Impressão (Fundo Branco)", data=html_impressao, file_name="afetivograma_para_impressao.html", mime="text/html")
-
-else:
-    st.info("Registre o primeiro dado para visualizar a evolução.")
+            m_raw = df_plot['DataHora_Real'].apply(lambda d: (d.year, d.month, d.strftime('%
