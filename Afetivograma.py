@@ -1,4 +1,4 @@
-# afetivograma_v.1.2
+# afetivograma_v.1.3
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -444,7 +444,7 @@ if not df_historico.empty:
         fig.update_layout(
             plot_bgcolor=bg_color, paper_bgcolor=bg_color, font=dict(color=font_color),
             hovermode="x unified", legend=dict(orientation="h", y=-0.22, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=20, t=20, b=20)
+            margin=dict(l=65, r=20, t=20, b=20)
         )
         
         fig.update_xaxes(
@@ -456,6 +456,7 @@ if not df_historico.empty:
         
         fig.update_yaxes(
             title_text="Evolução",
+            title_standoff=20,
             range=[-6.0, 3.8],
             tickvals=[-3, -2, -1, 0, 1, 2, 3],
             showgrid=True,
@@ -497,4 +498,4 @@ if not df_historico.empty:
 
 else:
     st.info("Registre o primeiro dado para visualizar a evolução.")
-# --- FIM DO CÓDIGO (v.1.2) ---
+# --- FIM DO CÓDIGO (v.1.3) ---
