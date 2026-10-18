@@ -75,7 +75,7 @@ def carregar_dados():
         sheet = gc.open(NOME_PLANILHA).sheet1
         dados = sheet.get_all_records()
         df = pd.DataFrame(dados) if dados else pd.DataFrame(columns=colunas_padrao)
-    except Exception as e:
+    except Exception:
         df = pd.DataFrame(columns=colunas_padrao)
 
     for col in colunas_padrao:
@@ -144,7 +144,7 @@ def carregar_registro_callback():
             reg = match.iloc[0]
             try:
                 st.session_state['in_data'] = datetime.strptime(str(reg['Data_Str']), "%d/%m/%Y").date()
-            except:
+            except Exception:
                 st.session_state['in_data'] = get_today_br()
             st.session_state['in_hora'] = str(reg['Horario_Str']) if str(reg['Horario_Str']) in horarios_opcoes else "21:30"
             st.session_state['in_humor'] = int(reg['Humor_Val']) if reg['Humor_Val'] != "" else 0
@@ -206,7 +206,11 @@ col_soc, col_gat, col_esq, col_not = st.columns([2, 3, 3, 5])
 with col_soc:
     st.selectbox("Sociedade", options=list(niveis_sociedade.keys()), format_func=lambda x: niveis_sociedade[x], key="in_soc")
 with col_gat:
-    opcoes_gatilhos = ["Expectativas sobre eventos", "Interação negativa com filha ou outros", "Frustração com tarefas", "Notícia triste", "Alteração no clima", "Esquecimento", "Incapacidade"]
+    opcoes_gatilhos = [
+        "Expectativas sobre eventos", "Interação negativa com filha ou outros",
+        "Frustração com tarefas", "Notícia triste", "Alteração no clima",
+        "Esquecimento", "Incapacidade"
+    ]
     st.multiselect("Gatilhos", options=opcoes_gatilhos, placeholder="Escolha...", key="in_gat")
 with col_esq:
     st.selectbox("Delírios/Psicose", options=list(niveis_esquizofrenia.keys()), format_func=lambda x: niveis_esquizofrenia[x], key="in_esq")
@@ -222,7 +226,8 @@ salvar = st.button(texto_botao, width='stretch')
 if salvar:
     if is_novo:
         novo_id = pd.to_numeric(df_historico['ID'], errors='coerce').max() + 1 if not df_historico.empty else 1
-        if pd.isnull(novo_id): novo_id = 1
+        if pd.isnull(novo_id):
+            novo_id = 1
     else:
         novo_id = opcoes_id_dict[st.session_state['in_id_sel']]
         df_historico = df_historico[df_historico['ID'] != novo_id]
@@ -266,19 +271,32 @@ if salvar:
 st.divider()
 
 if not df_historico.empty:
-    df_historico['DataHora_Real'] = pd.to_datetime(df_historico['Data_Str'] + ' ' + df_historico['Horario_Str'], format="%d/%m/%Y %H:%M", errors='coerce')
+    df_historico['DataHora_Real'] = pd.to_datetime(
+        df_historico['Data_Str'] + ' ' + df_historico['Horario_Str'],
+        format="%d/%m/%Y %H:%M",
+        errors='coerce'
+    )
     df_historico = df_historico.dropna(subset=['DataHora_Real']).sort_values(by='DataHora_Real').reset_index(drop=True)
-    df_historico['Sono_Vis'] = df_historico['Sono'].apply(lambda x: f"{int(x)}h{int((x % 1) * 60):02d}m".replace("h00m", "h") if pd.notnull(x) and x != "" else "")
+    df_historico['Sono_Vis'] = df_historico['Sono'].apply(
+        lambda x: f"{int(x)}h{int((x % 1) * 60):02d}m".replace("h00m", "h") if pd.notnull(x) and x != "" else ""
+    )
 
     col_f1, col_f2 = st.columns([5, 4])
     with col_f1:
-        filtro_tempo = st.radio("Período de Visualização:", ["Semanal (Dom-Sáb)", "Quinzenal", "Mensal", "Todos"], index=3, horizontal=True)
+        filtro_tempo = st.radio(
+            "Período de Visualização:",
+            ["Semanal (Dom-Sáb)", "Quinzenal", "Mensal", "Todos"],
+            index=3,
+            horizontal=True
+        )
 
     df_plot = df_historico.copy()
 
     if not df_plot.empty:
         if filtro_tempo == "Semanal (Dom-Sáb)":
-            df_plot['Semana_Inicio'] = df_plot['DataHora_Real'].apply(lambda d: (d - timedelta(days=(d.weekday() + 1) % 7)).replace(hour=0, minute=0, second=0))
+            df_plot['Semana_Inicio'] = df_plot['DataHora_Real'].apply(
+                lambda d: (d - timedelta(days=(d.weekday() + 1) % 7)).replace(hour=0, minute=0, second=0)
+            )
             semanas_unicas = sorted(df_plot['Semana_Inicio'].unique(), reverse=True)
             
             opcoes_semana = {}
@@ -308,9 +326,175 @@ if not df_historico.empty:
 
             ano, mes, q_num = opcoes_quinzena[sel_q]
             if q_num == 1:
-                df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes) & (df_plot['DataHora_Real'].dt.day <= 15)]
+                df_plot = df_plot[
+                    (df_plot['DataHora_Real'].dt.year == ano) &
+                    (df_plot['DataHora_Real'].dt.month == mes) &
+                    (df_plot['DataHora_Real'].dt.day <= 15)
+                ]
             else:
-                df_plot = df_plot[(df_plot['DataHora_Real'].dt.year == ano) & (df_plot['DataHora_Real'].dt.month == mes) & (df_plot['DataHora_Real'].dt.day > 15)]
+                df_plot = df_plot[
+                    (df_plot['DataHora_Real'].dt.year == ano) &
+                    (df_plot['DataHora_Real'].dt.month == mes) &
+                    (df_plot['DataHora_Real'].dt.day > 15)
+                ]
 
         elif filtro_tempo == "Mensal":
-            m_raw = df_plot['DataHora_Real'].apply(lambda d: (d.year, d.month, d.strftime('%
+            def get_mes_tuple(d):
+                return (d.year, d.month, d.strftime("%m/%Y"))
+
+            m_raw = df_plot['DataHora_Real'].apply(get_mes_tuple).unique()
+            m_sorted = sorted(m_raw, key=lambda x: (x[0], x[1]), reverse=True)
+            opcoes_mes = {x[2]: (x[0], x[1]) for x in m_sorted}
+
+            with col_f2:
+                sel_m = st.selectbox("Selecione o Mês:", options=list(opcoes_mes.keys()))
+
+            ano, mes = opcoes_mes[sel_m]
+            df_plot = df_plot[
+                (df_plot['DataHora_Real'].dt.year == ano) &
+                (df_plot['DataHora_Real'].dt.month == mes)
+            ]
+
+    def criar_figura(modo_impressao=False):
+        fig = go.Figure()
+
+        bg_color = '#FFFFFF' if modo_impressao else '#111111'
+        font_color = '#000000' if modo_impressao else 'white'
+        grid_color = '#CCCCCC' if modo_impressao else '#222222'
+        vline_color = '#BBBBBB' if modo_impressao else '#555555'
+
+        c_humor = '#1F618D' if modo_impressao else '#3498DB'
+        c_ansiedade = '#D35400' if modo_impressao else '#E67E22'
+        c_irritabilidade = '#C71585' if modo_impressao else '#FF1493'
+        c_sociedade = '#008B8B' if modo_impressao else '#00FFFF'
+        c_delirios = '#7D3C98' if modo_impressao else '#9B59B6'
+        c_sono = '#1E8449' if modo_impressao else '#2ECC71'
+        c_sexo = '#B7950B' if modo_impressao else '#F1C40F'
+        c_dor = '#C0392B' if modo_impressao else '#E74C3C'
+        c_estrela = '#111111' if modo_impressao else 'white'
+
+        if not df_plot.empty:
+            for dt_reg in df_plot['DataHora_Real']:
+                fig.add_vline(x=dt_reg, line_width=1, line_dash="dot", line_color=vline_color)
+
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=df_plot['Humor_Val'], name="Humor",
+                customdata=df_plot['Humor_Desc'], mode='lines+markers', line_shape='spline',
+                line=dict(color=c_humor, width=3), marker=dict(size=9),
+                hovertemplate="<b>Humor:</b> %{customdata}<extra></extra>"
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=df_plot['Ansiedade_Val'], name="Ansiedade",
+                customdata=df_plot['Ansiedade_Desc'], mode='lines+markers', line_shape='spline',
+                line=dict(color=c_ansiedade, width=2),
+                hovertemplate="<b>Ansiedade:</b> %{customdata}<extra></extra>"
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=df_plot['Irritabilidade_Val'], name="Irritabilidade",
+                customdata=df_plot['Irritabilidade_Desc'], mode='lines+markers', line_shape='spline',
+                line=dict(color=c_irritabilidade, width=2),
+                hovertemplate="<b>Irritabilidade:</b> %{customdata}<extra></extra>"
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=df_plot['Social_Val'], name="Sociedade",
+                customdata=df_plot['Social_Desc'], mode='lines+markers', line_shape='spline',
+                line=dict(color=c_sociedade, width=2),
+                hovertemplate="<b>Sociedade:</b> %{customdata}<extra></extra>"
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=df_plot['Esquizofrenia_Val'], name="Delírios",
+                customdata=df_plot['Esquizofrenia_Clinico'], mode='lines+markers', line_shape='spline',
+                line=dict(color=c_delirios, width=2),
+                hovertemplate="<b>Delírios/Psicose:</b> %{customdata}<extra></extra>"
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_plot['DataHora_Real'], y=[-3.6] * len(df_plot), name="Sono",
+                text=df_plot['Sono_Vis'], mode='text', textposition='top center',
+                textfont=dict(color=c_sono, size=11),
+                hovertemplate="<b>Horas de Sono:</b> %{text}<extra></extra>"
+            ))
+
+            df_sexo = df_plot[df_plot['Sexo_Val'] == 1]
+            if not df_sexo.empty:
+                fig.add_trace(go.Scatter(
+                    x=df_sexo['DataHora_Real'], y=[-4.2] * len(df_sexo), name="Sexo",
+                    mode='markers', marker=dict(symbol='square', color=c_sexo, size=9),
+                    hovertemplate="<b>Atividade Sexual:</b> Sim<extra></extra>"
+                ))
+
+            df_dor = df_plot[df_plot['Condicao_Fisica'].astype(str) != ""]
+            if not df_dor.empty:
+                fig.add_trace(go.Scatter(
+                    x=df_dor['DataHora_Real'], y=[-4.8] * len(df_dor), name="Dor / Físico",
+                    customdata=df_dor['Condicao_Fisica'], mode='markers',
+                    marker=dict(symbol='square', color=c_dor, size=9),
+                    hovertemplate="<b>Condição Física:</b> %{customdata}<extra></extra>"
+                ))
+
+            df_notas = df_plot[(df_plot['Notas'].astype(str) != "") | (df_plot['Gatilhos'].astype(str) != "")].copy()
+            if not df_notas.empty:
+                df_notas['Hover_Notas'] = "Anotação: " + df_notas['Notas'].astype(str) + "<br>Gatilhos: " + df_notas['Gatilhos'].astype(str)
+                fig.add_trace(go.Scatter(
+                    x=df_notas['DataHora_Real'], y=[-5.4] * len(df_notas), name="Anotações / Gatilhos",
+                    customdata=df_notas['Hover_Notas'], mode='markers',
+                    marker=dict(symbol='star', color=c_estrela, size=11),
+                    hovertemplate="<b>%{customdata}</b><extra></extra>"
+                ))
+
+        fig.update_layout(
+            plot_bgcolor=bg_color, paper_bgcolor=bg_color, font=dict(color=font_color),
+            hovermode="x unified", legend=dict(orientation="h", y=-0.22, x=0.5, xanchor="center"),
+            margin=dict(l=20, r=20, t=20, b=20)
+        )
+        
+        fig.update_xaxes(
+            showgrid=False,
+            tickmode='array',
+            tickvals=df_plot['DataHora_Real'] if not df_plot.empty else [],
+            ticktext=df_plot['DataHora_Real'].dt.strftime("%d/%m\n%H:%M") if not df_plot.empty else []
+        )
+        
+        fig.update_yaxes(
+            title_text="Evolução",
+            range=[-6.0, 3.8],
+            tickvals=[-3, -2, -1, 0, 1, 2, 3],
+            showgrid=True,
+            gridcolor=grid_color,
+            gridwidth=1
+        )
+        return fig
+
+    fig = criar_figura(modo_impressao=False)
+    st.plotly_chart(fig, width='stretch')
+
+    col_dl1, col_dl2, col_dl3 = st.columns([2.5, 2.5, 7])
+    with col_dl1:
+        output_xlsx = BytesIO()
+        df_historico.drop(columns=['DataHora_Real', 'Sono_Vis'], errors='ignore').to_excel(output_xlsx, index=False, engine='openpyxl')
+        st.download_button(
+            "📥 Baixar Tabela (.xlsx)",
+            data=output_xlsx.getvalue(),
+            file_name="afetivograma_dados.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    with col_dl2:
+        html_grafico = fig.to_html(full_html=True, include_plotlyjs='cdn')
+        st.download_button(
+            "📉 Baixar Gráfico (.html)",
+            data=html_grafico,
+            file_name="afetivograma_grafico.html",
+            mime="text/html"
+        )
+    with col_dl3:
+        fig_impressao = criar_figura(modo_impressao=True)
+        html_impressao = fig_impressao.to_html(full_html=True, include_plotlyjs='cdn')
+        st.download_button(
+            "🖨️ Baixar Gráfico para Impressão (.html)",
+            data=html_impressao,
+            file_name="afetivograma_impressao.html",
+            mime="text/html"
+        )
+
+else:
+    st.info("Registre o primeiro dado para visualizar a evolução.")
+# --- FIM DO CÓDIGO (v.1.2) ---
