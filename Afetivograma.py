@@ -1,4 +1,4 @@
-# afetivograma_v.1.3
+# afetivograma_v.1.4
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -286,7 +286,7 @@ if not df_historico.empty:
         filtro_tempo = st.radio(
             "Período de Visualização:",
             ["Semanal (Dom-Sáb)", "Quinzenal", "Mensal", "Todos"],
-            index=3,
+            index=2,
             horizontal=True
         )
 
@@ -345,9 +345,13 @@ if not df_historico.empty:
             m_raw = df_plot['DataHora_Real'].apply(get_mes_tuple).unique()
             m_sorted = sorted(m_raw, key=lambda x: (x[0], x[1]), reverse=True)
             opcoes_mes = {x[2]: (x[0], x[1]) for x in m_sorted}
+            lista_meses = list(opcoes_mes.keys())
+
+            mes_atual_str = get_today_br().strftime("%m/%Y")
+            idx_mes_padrao = lista_meses.index(mes_atual_str) if mes_atual_str in lista_meses else 0
 
             with col_f2:
-                sel_m = st.selectbox("Selecione o Mês:", options=list(opcoes_mes.keys()))
+                sel_m = st.selectbox("Selecione o Mês:", options=lista_meses, index=idx_mes_padrao)
 
             ano, mes = opcoes_mes[sel_m]
             df_plot = df_plot[
@@ -498,4 +502,4 @@ if not df_historico.empty:
 
 else:
     st.info("Registre o primeiro dado para visualizar a evolução.")
-# --- FIM DO CÓDIGO (v.1.3) ---
+# --- FIM DO CÓDIGO (v.1.4) ---
